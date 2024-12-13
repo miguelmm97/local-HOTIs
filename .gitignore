@@ -1,0 +1,7 @@
+*.idea/
+*.h5
+*__pycache__/
+*.py[cod]
+*.pdf
+*.png
+/home/mfmm/Projects/localHOTIs/base-code/modules
