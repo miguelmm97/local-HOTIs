@@ -102,5 +102,6 @@ ax1 = fig2.add_subplot(gs[0, 0])
 ax1.plot(np.arange(len(eps)), eps, marker='o', color='dodgerblue')
 ax1.set_xlabel('Eigenstate')
 ax1.set_ylabel('$\\eps/gamma')
+print('fun')
 
 plt.show()
