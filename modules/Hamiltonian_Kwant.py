@@ -47,6 +47,28 @@ sigma_z = np.array([[1, 0], [0, -1]], dtype=np.complex128)
 tau_0, tau_x, tau_y, tau_z = sigma_0, sigma_x, sigma_y, sigma_z
 
 
+def displacement2D(x1, y1, x2, y2):
+
+    v = np.zeros((2,))
+    v[0] = (x2 - x1)
+    v[1] = (y2 - y1)
+
+    # Norm of the vector between sites 2 and 1
+    r = np.sqrt(v[0] ** 2 + v[1] ** 2)
+
+    # Phi angle of the vector between sites 2 and 1 (angle in the XY plane)
+    if v[0] == 0:                                    # Pathological case, separated to not divide by 0
+        if v[1] > 0:
+            phi = pi / 2                             # Hopping in y
+        else:
+            phi = 3 * pi / 2                         # Hopping in -y
+    else:
+        if v[1] > 0:
+            phi = np.arctan2(v[1], v[0])             # 1st and 2nd quadrants
+        else:
+            phi = 2 * pi + np.arctan2(v[1], v[0])    # 3rd and 4th quadrants
+
+    return r, phi
 
 def displacement2D_kwant(site0, site1):
     x1, y1 = site0.pos[0], site0.pos[1]
@@ -73,12 +95,11 @@ def displacement2D_kwant(site0, site1):
 
     return r, phi
 
-def hopping(gamma, lamb, d, phi, cutoff_dist):
+def hopping(lamb, d, phi, cutoff_dist):
     f_cutoff = np.heaviside(cutoff_dist - d, 1) * np.exp(-d + 1)
-    normal_hopp = gamma * (np.kron(sigma_x, tau_0) + np.kron(sigma_y, tau_y))
     hopp_x = 0.5 * lamb * np.abs(np.cos(phi)) * (np.kron(sigma_x, tau_0) - 1j * np.kron(sigma_y, tau_z))
     hopp_y = - 0.5 * lamb * np.abs(np.sin(phi)) * (np.kron(sigma_y, tau_y) + 1j * np.kron(sigma_y, tau_x))
-    return f_cutoff * (normal_hopp + hopp_x + hopp_y)
+    return f_cutoff * (hopp_x + hopp_y)
 
 def spectrum(H, Nsp=None):
 
@@ -99,6 +120,66 @@ def spectrum(H, Nsp=None):
     rho = U @ np.conj(np.transpose(U))
 
     return energy, eigenstates, rho
+
+def reduced_OPDM(rho, site_indices, Nsp=None):
+
+    Nred = len(site_indices) * 4
+    rho_red = np.zeros((Nred, Nred), dtype=np.complex128)
+    for i, site1 in enumerate(site_indices):
+        for j, site2 in enumerate(site_indices):
+            block1 = site1 * 4
+            block2 = site2 * 4
+            rho_red[i * 4: i * 4 + 4, j * 4: j * 4 + 4] = rho[block1: block1 + 4, block2: block2 + 4]
+
+    return rho_red
+
+def local_DoS(state, Nsites):
+
+    local_DoS = np.zeros((Nsites, ), dtype=np.complex128)
+    for i in range(Nsites):
+        psi_i = state[i * 4: i * 4 + 4]
+        local_DoS[i] = psi_i.T.conj() @ psi_i
+
+    if np.sum(np.imag(local_DoS)) < 1e-10:
+        local_DoS = np.real(local_DoS)
+    else:
+        raise ValueError('DoS is complex.')
+
+    return local_DoS
+
+def bbh_hamiltonian(lattice, param_dict):
+
+    # Load parameters into the builder namespace
+    try:
+        gamma  = param_dict['gamma']
+        lamb   = param_dict['lamb']
+    except KeyError as err:
+        raise KeyError(f'Parameter error: {err}')
+
+    # Definitions
+    Nstates = int(lattice.Nx * lattice.Ny * 4)
+    H = np.zeros((Nstates, Nstates), dtype=np.complex128)
+
+    for i in range(lattice.Nsites):
+        # Onsite
+        i_block = i * 4
+        if lattice.K_hopp < 1e-12:
+            H[i_block: i_block + 4, i_block: i_block + 4] = gamma * (np.kron(sigma_x, tau_0) + np.kron(sigma_y, tau_y))
+        else:
+            H[i_block: i_block + 4, i_block: i_block + 4] = np.kron(sigma_0, tau_0) * lattice.disorder[i, i] + \
+                                                            gamma * (np.kron(sigma_x, tau_0) + np.kron(sigma_y, tau_y))
+        # Hopping
+        for n in lattice.neighbours[i]:
+            n_block = n * 4
+            d, phi = displacement2D(lattice.x[i], lattice.y[i],  lattice.x[n], lattice.y[n])
+            print(i, n, i_block, n_block)
+            H[i_block: i_block + 4, n_block: n_block + 4] = hopping(lamb, d, phi, lattice.r)
+
+    return H
+
+
+
+
 
 
 class FullyAmorphousWire_ScatteringRegion(kwant.builder.SiteFamily):
@@ -143,19 +224,21 @@ def Hamiltonian_Kwant(lattice_tree, param_dict):
     # Hopping and onsite functions
     def onsite_potential(site):
         if lattice_tree.K_hopp < 1e-12:
-            return np.zeros((4, 4))
+            return gamma * (np.kron(sigma_x, tau_0) + np.kron(sigma_y, tau_y))
         else:
             index = site.tag[0]
-            return np.kron(sigma_0, tau_0) * lattice_tree.disorder[index, index]
+            return np.kron(sigma_0, tau_0) * lattice_tree.disorder[index, index] + \
+                gamma * (np.kron(sigma_x, tau_0) + np.kron(sigma_y, tau_y))
+
 
     def hopp(site1, site0):
         index0, index1 = site0.tag[0], site1.tag[0]
         index_neigh = lattice_tree.neighbours[index0].index(index1)
         d, phi= displacement2D_kwant(site1, site0)
         if lattice_tree.K_hopp < 1e-12:
-            return hopping(gamma, lamb, d, phi, lattice_tree.r)
+            return hopping(lamb, d, phi, lattice_tree.r)
         else:
-            return hopping(gamma, lamb, d, phi, lattice_tree.r)  + \
+            return hopping(lamb, d, phi, lattice_tree.r)  + \
                 np.kron(sigma_0, tau_0) * lattice_tree.disorder[index0, index_neigh]
 
     # Initialise kwant system
@@ -170,3 +253,5 @@ def Hamiltonian_Kwant(lattice_tree, param_dict):
             syst[(latt(n), latt(i))] = hopp
 
     return syst
+
+
