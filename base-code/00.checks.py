@@ -111,12 +111,12 @@ plt.rc('text', usetex=True)
 plt.rc('font', family='serif')
 color_list = ['limegreen', 'dodgerblue', 'm', 'r', 'orange']
 markersize = 5
-fontsize=20
-site_size  = 0.1
-site_lw    = 0.01
+fontsize = 20
+site_size  = 0.3
+site_lw    = 0.05
 site_color = 'm'
 hop_color  = 'royalblue'
-hop_lw     = 0.05
+hop_lw     = 0.1
 lead_color = 'r'
 
 # Defining a colormap
@@ -149,6 +149,8 @@ ax1 = fig2.add_subplot(gs[0, 0])
 ax1.plot(np.arange(len(eps)), eps, marker='o', color='dodgerblue', linestyle='None', markersize=1)
 ax1.set_xlabel('Eigenstate', fontsize=fontsize)
 ax1.set_ylabel('$\epsilon$', fontsize=fontsize)
+ax1.set_ylim([-0.5, 0.5])
+ax1.set_xlim([600, 1000])
 print('fun')
 
 
