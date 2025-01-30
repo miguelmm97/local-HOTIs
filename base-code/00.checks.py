@@ -48,15 +48,23 @@ stream_handler.setFormatter(formatter)
 loger_main.addHandler(stream_handler)
 
 
-#%% Variables
 
+#%% Variables
 gamma = 0.2
 lamb = 1
-width = 0.15
+width = 0.000001
 r = 1.3
-Nx = 20
-Ny = 20
+Nx = 10
+Ny = 10
+Nsites = Nx * Ny
 params_dict = {'gamma': gamma, 'lamb': lamb}
+
+sigma_0 = np.eye(2, dtype=np.complex128)
+sigma_x = np.array([[0, 1], [1, 0]], dtype=np.complex128)
+sigma_y = np.array([[0, -1j], [1j, 0]], dtype=np.complex128)
+sigma_z = np.array([[1, 0], [0, -1]], dtype=np.complex128)
+tau_0, tau_x, tau_y, tau_z = sigma_0, sigma_x, sigma_y, sigma_z
+
 #%% Main
 
 loger_main.info('Generating fully amorphous lattice...')
@@ -74,7 +82,6 @@ rho_values, rho_vecs = np.linalg.eigh(rho)
 idx = rho_values.argsort()
 rho_values = rho_values[idx]
 rho_vecs = rho_vecs[:, idx]
-
 
 
 # DoS
@@ -101,6 +108,26 @@ idx = rho_red_values.argsort()
 rho_red_values = rho_red_values[idx]
 rho_red_vecs = rho_red_vecs[:, idx]
 
+
+# """"Local marker"""
+S = np.kron(np.eye(Nsites), np.kron(tau_z, sigma_0))
+print(np.allclose(S @ H @ S, -H))
+print(np.allclose(rho @ S + S @ rho, S))
+theta = np.zeros((Nsites, Nsites))
+def theta_func(x, b, a):
+    return 1 -  1 / (1 + np.exp(-a * (x - b)))
+for i in range(Nsites):
+    x, y = lattice.x[i], lattice.y[i]
+    r = np.sqrt(x ** 2 + y ** 2)
+    theta[i, i] = theta_func(r, Nx / 5, 5)
+
+theta_full = np.kron(theta, np.eye(4))
+band_flat_rho = 2 * rho - np.eye(int(Nsites * 4))
+band_flat_rho2 = band_flat_rho @ band_flat_rho
+operator = S @ (1 - band_flat_rho2) @ theta_full
+invariant = [np.trace(operator[4* i: 4 * i+4, 4* i: 4 * i+4]) for i in range(Nsites)]
+invariant = np.array(invariant)
+invariant2 = np.trace(operator)
 
 
 
@@ -149,8 +176,8 @@ ax1 = fig2.add_subplot(gs[0, 0])
 ax1.plot(np.arange(len(eps)), eps, marker='o', color='dodgerblue', linestyle='None', markersize=1)
 ax1.set_xlabel('Eigenstate', fontsize=fontsize)
 ax1.set_ylabel('$\epsilon$', fontsize=fontsize)
-ax1.set_ylim([-0.5, 0.5])
-ax1.set_xlim([600, 1000])
+# ax1.set_ylim([-0.5, 0.5])
+# ax1.set_xlim([600, 1000])
 print('fun')
 
 
@@ -174,6 +201,15 @@ ax1.set_xlabel('Eigenvectors', fontsize=fontsize)
 ax1.set_ylabel('Eigenvalues', fontsize=fontsize)
 ax2.set_xlabel('Eigenvectors', fontsize=fontsize)
 ax2.set_ylabel('Eigenvalues', fontsize=fontsize)
+
+
+
+fig5 = plt.figure()
+gs = GridSpec(1, 1, figure=fig5, wspace=0.2, hspace=0.3)
+ax1 = fig5.add_subplot(gs[0, 0])
+ax1.scatter(site_pos[:, 0], site_pos[:, 1], c=np.diag(theta),  facecolor='white', edgecolor='black', linewidth=2)
+ax1.scatter(site_pos[:, 0], site_pos[:, 1], c=np.diag(theta), cmap=color_map, vmin=0, vmax=1)
+ax1.set_axis_off()
 
 
 
