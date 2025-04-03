@@ -178,10 +178,6 @@ def bbh_hamiltonian(lattice, param_dict):
     return H
 
 
-
-
-
-
 class FullyAmorphousWire_ScatteringRegion(kwant.builder.SiteFamily):
     def __init__(self, norbs, lattice, name=None):
 
