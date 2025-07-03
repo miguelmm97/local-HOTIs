@@ -234,8 +234,6 @@ cbar = fig5.colorbar(colormap, cax=cax, orientation='vertical')
 cbar_ax.set_axis_off()
 
 
-
-
 divnorm = mcolors.TwoSlopeNorm(vmin=-1, vcenter=0, vmax=1)
 hex_list = ['#ff416d', '#ff7192', '#ffa0b6', '#ffd0db', '#ffffff', '#cfdaff', '#9fb6ff', '#6f91ff', '#3f6cff']
 colormap = cm.ScalarMappable(norm=Normalize(vmin=-1, vmax=1), cmap=get_continuous_cmap(hex_list))
