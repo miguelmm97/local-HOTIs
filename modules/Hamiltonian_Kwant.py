@@ -163,11 +163,8 @@ def bbh_hamiltonian(lattice, param_dict):
     for i in range(lattice.Nsites):
         # Onsite
         i_block = i * 4
-        if lattice.K_hopp < 1e-12:
-            H[i_block: i_block + 4, i_block: i_block + 4] = gamma * (np.kron(sigma_x, tau_0) + np.kron(sigma_y, tau_y))
-        else:
-            H[i_block: i_block + 4, i_block: i_block + 4] = np.kron(sigma_0, tau_0) * lattice.disorder[i, i] + \
-                                                            gamma * (np.kron(sigma_x, tau_0) + np.kron(sigma_y, tau_y))
+        H[i_block: i_block + 4, i_block: i_block + 4] = gamma * (np.kron(sigma_x, tau_0) + np.kron(sigma_y, tau_y))
+
         # Hopping
         for n in lattice.neighbours[i]:
             n_block = n * 4
@@ -219,23 +216,12 @@ def Hamiltonian_Kwant(lattice_tree, param_dict):
 
     # Hopping and onsite functions
     def onsite_potential(site):
-        if lattice_tree.K_hopp < 1e-12:
-            return gamma * (np.kron(sigma_x, tau_0) + np.kron(sigma_y, tau_y))
-        else:
-            index = site.tag[0]
-            return np.kron(sigma_0, tau_0) * lattice_tree.disorder[index, index] + \
-                gamma * (np.kron(sigma_x, tau_0) + np.kron(sigma_y, tau_y))
-
+        return gamma * (np.kron(sigma_x, tau_0) + np.kron(sigma_y, tau_y))
 
     def hopp(site1, site0):
-        index0, index1 = site0.tag[0], site1.tag[0]
-        index_neigh = lattice_tree.neighbours[index0].index(index1)
-        d, phi= displacement2D_kwant(site1, site0)
-        if lattice_tree.K_hopp < 1e-12:
-            return hopping(lamb, d, phi, lattice_tree.r)
-        else:
-            return hopping(lamb, d, phi, lattice_tree.r)  + \
-                np.kron(sigma_0, tau_0) * lattice_tree.disorder[index0, index_neigh]
+        d, phi = displacement2D_kwant(site1, site0)
+        print(d, phi)
+        return hopping(lamb, d, phi, lattice_tree.r)
 
     # Initialise kwant system
     loger_kwant.trace('Creating kwant scattering region...')
@@ -246,7 +232,11 @@ def Hamiltonian_Kwant(lattice_tree, param_dict):
     for i in range(latt.Nsites):
         for n in lattice_tree.neighbours[i]:
             loger_kwant.trace(f'Defining hopping from site {i} to {n}.')
-            syst[(latt(n), latt(i))] = hopp
+            print('-----', n, '--', i, '------')
+            x1, y1 = latt(n).pos[0], latt(n).pos[1]
+            x2, y2 = latt(i).pos[0], latt(i).pos[1]
+            print(x1, y1, x2, y2)
+            syst[(latt(n), latt(i))] = hopp(latt(n), latt(i))
 
     return syst
 

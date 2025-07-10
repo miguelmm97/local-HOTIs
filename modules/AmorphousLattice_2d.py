@@ -53,7 +53,6 @@ def gaussian_point_set_2D(x, y, width):
 
 @dataclass
 class AmorphousLattice_2d:
-    """ Infinite amorphous cross-section nanowire based on the crystalline Fu and Berg model"""
 
     # Class fields set upon instantiation
     Nx:  int                                          # Number of lattice sites along x direction
