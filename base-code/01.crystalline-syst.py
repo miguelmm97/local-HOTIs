@@ -127,7 +127,7 @@ rho_red = reduced_OPDM(rho, indices)
 rho_red_values, rho_red_vecs = np.linalg.eigh(rho_red)
 idx = rho_red_values.argsort()
 rho_red_values, rho_red_vecs = rho_red_values[idx],  rho_red_vecs[:, idx]
-band_flat_rho_red = 2 * rho_red - np.eye(int(Nred * 4))
+band_flat_rho_red = rho_red #2 * rho_red - np.eye(int(Nred * 4))
 
 # Theta and chiral symmetry for the reduced OPDM
 C = np.kron(np.eye(Nred), np.kron(tau_z, sigma_0))
@@ -140,8 +140,8 @@ theta_op = np.kron(theta, np.eye(4))
 
 # Mode and shell invariants
 band_flat_rho_red2 = band_flat_rho_red @ band_flat_rho_red
-Imode_op = C @ (band_flat_rho_red - band_flat_rho_red2) @ theta_op
-Ishell_op = - 0.5 * C @ band_flat_rho_red @ (band_flat_rho_red @ theta_op - theta_op @ band_flat_rho_red)
+Imode_op = 4 * C @ (band_flat_rho_red - band_flat_rho_red2) @ theta_op
+Ishell_op = - 2 * C @ band_flat_rho_red @ (band_flat_rho_red @ theta_op - theta_op @ band_flat_rho_red)
 Imode_marker = np.real([np.trace(Imode_op[4 * i: 4 * i + 4, 4 * i: 4 * i + 4]) for i in range(Nred)])
 Ishell_marker = np.real([np.trace(Ishell_op[4 * i: 4 * i + 4, 4 * i: 4 * i + 4]) for i in range(Nred)])
 loger_main.info(f'Imode: {np.sum(Imode_marker)}')
@@ -239,4 +239,5 @@ cax = divider.append_axes("right", size="5%", pad=0.1)
 fig5.colorbar(colormap_marker, cax=cax, orientation='vertical')
 
 
+# fig5.savefig('fig1.pdf', format='pdf')
 plt.show()
