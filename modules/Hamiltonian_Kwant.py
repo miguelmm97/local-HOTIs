@@ -220,7 +220,6 @@ def Hamiltonian_Kwant(lattice_tree, param_dict):
 
     def hopp(site1, site0):
         d, phi = displacement2D_kwant(site1, site0)
-        print(d, phi)
         return hopping(lamb, d, phi, lattice_tree.r)
 
     # Initialise kwant system
@@ -232,11 +231,7 @@ def Hamiltonian_Kwant(lattice_tree, param_dict):
     for i in range(latt.Nsites):
         for n in lattice_tree.neighbours[i]:
             loger_kwant.trace(f'Defining hopping from site {i} to {n}.')
-            print('-----', n, '--', i, '------')
-            x1, y1 = latt(n).pos[0], latt(n).pos[1]
-            x2, y2 = latt(i).pos[0], latt(i).pos[1]
-            print(x1, y1, x2, y2)
-            syst[(latt(n), latt(i))] = hopp(latt(n), latt(i))
+            syst[(latt(n), latt(i))] = hopp
 
     return syst
 

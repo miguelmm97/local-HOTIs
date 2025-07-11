@@ -74,7 +74,6 @@ class AmorphousLattice_C4:
 
     # Methods for building the lattice
     def build_lattice(self):
-
         if self.w  < 1e-10:
             loger_amorphous.error('The amorphicity cannot be strictly 0')
             exit()

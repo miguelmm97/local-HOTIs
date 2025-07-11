@@ -57,15 +57,16 @@ loger_main.addHandler(stream_handler)
 #%% Variables
 gamma             = 0.5
 lamb              = 1
-width             = 0.0000001
+width             = 0.05
 r                 = 1.3
-Nx                = 10
-Ny                = 10
+Nx                = 20
+Ny                = 20
 Nsites            = Nx * Ny
 cutx, cuty        = 0.5 * Nx, 0.5 * Ny
 center_theta      = cutx / 2
 sharpness_theta   = 1 * center_theta
 params_dict = {'gamma': gamma, 'lamb': lamb}
+C4symm = True
 
 # Sigma matrices
 sigma_0 = np.eye(2, dtype=np.complex128)
@@ -83,40 +84,18 @@ def theta_func(x, b, a):
 # Lattice
 loger_main.info('Generating fully amorphous lattice...')
 lattice = AmorphousLattice_2d(Nx=Nx, Ny=Ny, w=width, r=r)
-# lattice = AmorphousLattice_C4(Nx=Nx, Ny=Ny, w=width, r=r)
-lattice.build_lattice()
-# lattice_check.build_lattice()
-bbh_model = Hamiltonian_Kwant(lattice, params_dict).finalized()
-# print('CHECK')
-# bbh_model_check = Hamiltonian_Kwant(lattice_check, params_dict).finalized()
+lattice.build_lattice(C4symmetry=C4symm)
 loger_main.info('Lattice promoted to Kwant successfully.')
 
 # Spectrum of the closed system
-loger_main.info('Calculating spectrum:')
+loger_main.info('Calculating Hamiltonian and spectrum:')
+bbh_model = Hamiltonian_Kwant(lattice, params_dict).finalized()
 H = bbh_model.hamiltonian_submatrix()
-# print(np.allclose(H, H.T.conj()))
-
-# Hcheck = bbh_model_check.hamiltonian_submatrix()
-# print(np.allclose(H, Hcheck))
 eps, eigenvectors, rho = spectrum(H)
-# eps_check, eigenvectors_check, rho_check = spectrum(Hcheck)
 rho_values, rho_vecs = np.linalg.eigh(rho)
 idx = rho_values.argsort()
 rho_values = rho_values[idx]
 rho_vecs = rho_vecs[:, idx]
-
-# f = [2, 3, 1, 0]
-# for i in range(Nsites):
-#     for j in range(Nsites):
-#         iC4 = f[i]
-#         jC4 = f[j]
-#         print('------', i, j, iC4, jC4, '--------')
-#         print(np.allclose(H[iC4 * 4: iC4 * 4 + 4, jC4 * 4: jC4 * 4 + 4], Hcheck[i * 4: i * 4 + 4, j * 4: j * 4 + 4], atol=1e-8))
-#         if not np.allclose(H[iC4 * 4: iC4 * 4 + 4, jC4 * 4: jC4 * 4 + 4], Hcheck[i * 4: i * 4 + 4, j * 4: j * 4 + 4], atol=1e-8):
-#             print(H[iC4 * 4: iC4 * 4 + 4, jC4 * 4: jC4 * 4 + 4])
-#             print(Hcheck[i * 4: i * 4 + 4, j * 4: j * 4 + 4])
-
-
 
 # Symmetry checks
 S = np.kron(np.eye(Nsites), np.kron(tau_z, sigma_0))
@@ -125,16 +104,15 @@ loger_main.info(f'Chiral symmetry of rho: {np.allclose(rho @ S + S @ rho, S)}')
 
 # DoS for the zero modes
 site_pos = np.array([site.pos for site in bbh_model.id_by_site])
-# state1 = eigenvectors[:, int(0.5 * Nx * Ny * 4)]
+state1 = eigenvectors[:, int(0.5 * Nx * Ny * 4)]
 state2 = eigenvectors[:, int(0.5 * Nx * Ny * 4) - 1]
-# state3 = eigenvectors[:, int(0.5 * Nx * Ny * 4) + 1]
+state3 = eigenvectors[:, int(0.5 * Nx * Ny * 4) + 1]
 state4 = eigenvectors[:, int(0.5 * Nx * Ny * 4) - 2]
-# DoS1 = local_DoS(state1, int(Nx * Ny))
+DoS1 = local_DoS(state1, int(Nx * Ny))
 DoS2 = local_DoS(state2, int(Nx * Ny))
-# DoS3 = local_DoS(state3, int(Nx * Ny))
+DoS3 = local_DoS(state3, int(Nx * Ny))
 DoS4 = local_DoS(state4, int(Nx * Ny))
-# DoS_edge = DoS1  + DoS2 + DoS3 + DoS4
-DoS_edge = DoS2 + DoS4
+DoS_edge = DoS1  + DoS2 + DoS3 + DoS4
 
 #%% Main: Local marker an OPDM
 
@@ -201,21 +179,6 @@ divnorm = mcolors.TwoSlopeNorm(vmin=-1, vcenter=0, vmax=1)
 hex_list = ['#ff416d', '#ff7192', '#ffa0b6', '#ffd0db', '#ffffff', '#cfdaff', '#9fb6ff', '#6f91ff', '#3f6cff']
 cmap = get_continuous_cmap(hex_list)
 colormap_marker = cm.ScalarMappable(norm=divnorm, cmap=cmap)
-
-
-# fig1 = plt.figure()
-# gs = GridSpec(1, 1, figure=fig1)
-# ax0 = fig1.add_subplot(gs[0, 0])
-# lattice.plot_lattice(ax0)
-
-fig1 = plt.figure()
-gs = GridSpec(1, 1, figure=fig1, wspace=0.2, hspace=0.3)
-ax1 = fig1.add_subplot(gs[0, 0])
-ax1.set_axis_off()
-kwant.plot(bbh_model, site_size=site_size, site_lw=site_lw, site_color=site_color, hop_lw=hop_lw, hop_color=hop_color,
-           site_edgecolor=None, ax=ax1)
-ax1.set_title('Lattice structure')
-
 
 
 fig5 = plt.figure(figsize=(12, 6))

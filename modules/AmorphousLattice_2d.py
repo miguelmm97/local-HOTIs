@@ -55,104 +55,124 @@ def gaussian_point_set_2D(x, y, width):
 class AmorphousLattice_2d:
 
     # Class fields set upon instantiation
-    Nx:  int                                          # Number of lattice sites along x direction
-    Ny:  int                                          # Number of lattice sites along y direction
-    w:   float                                        # Width of the Gaussian distribution
-    r:   float                                        # Cutoff distance to consider neighbours
+    Nx:  int                                        # Number of lattice sites along x direction
+    Ny:  int                                        # Number of lattice sites along y direction
+    w:   float                                      # Width of the Gaussian distribution
+    r:   float                                      # Cutoff distance to consider neighbours
 
     # Class fields that can be set externally
-    x: np.ndarray         = None                      # x position of the sites
-    y: np.ndarray         = None                      # y position of the sites
-    K_onsite: float       = None                      # Strength of the onsite disorder distribution
-    K_hopp:   float       = None                      # Strength of the hopping disorder distribution
-    disorder: np.ndarray  = None                      # Disorder matrix
+    x: np.ndarray   = None                          # x position of the sites
+    y: np.ndarray   = None                          # y position of the sites
+    coords: np.ndarray = None                       # Coordinates of the lattice sites
+    K_onsite: float = None                          # Strength of the onsite disorder distribution
+    onsite_disorder: np.ndarray = None              # Disorder array for only the onsite case
 
     # Class fields that can only be set internally
-    Nsites: int = field(init=False)                         # Number of sites in the cross-section
-    neighbours: np.ndarray = field(init=False)              # Neighbours list for each site
-    neighbours_projection: np.ndarray = field(init=False)   # Neighbours list for each site on the 2d projection
+    Nsites: int = field(init=False)                 # Number of sites in the cross-section
+    neighbours: np.ndarray = field(init=False)      # Neighbours list for each site
+    area: float = field(init=False)                 # Area of the wire's cross-section
 
 
     # Methods for building the lattice
-
-    def build_lattice(self, n_tries=0, restrict_connectivity=False):
-
-        if n_tries > 100:
-            loger_amorphous.error('Loop. Parameters might not allow an acceptable configuration.')
-        if self.w  < 1e-10:
+    def build_lattice(self, C4symmetry=False):
+        if self.w < 1e-10:
             loger_amorphous.error('The amorphicity cannot be strictly 0')
             exit()
+        self.generate_configuration()
+        if C4symmetry:
+            self.generate_C4symmetric_configuration()
+        self.generate_neighbour_tree()
 
-        # Restricting to only connected lattice configurations
-        if restrict_connectivity:
-            try:
-                self.generate_configuration(restrict_connectivity=True)
-                loger_amorphous.trace('Configuration accepted!')
-            except Exception as error:
-                loger_amorphous.warning(f'{error}')
-                try:
-                    self.erase_configuration()
-                    self.erase_disorder()
-                    self.build_lattice(n_tries=n_tries + 1, restrict_connectivity=True)
-                except RecursionError:
-                    loger_amorphous.error('Recursion error. Infinite loop. Terminating...')
-                    exit()
-        else:
-            # Accepting literally anything
-            self.generate_configuration()
+    def generate_neighbour_tree(self):
+        self.neighbours = KDTree(self.coords.T).query_ball_point(self.coords.T, self.r)
+        for i in range(self.Nsites):
+            self.neighbours[i].remove(i)
 
-    def generate_configuration(self, restrict_connectivity=False):
+    def generate_configuration(self):
         loger_amorphous.trace('Generating lattice and neighbour tree...')
 
-        # Positions of x and y coordinates on the amorphous lattice
+        # Positions of x and y coordinates on the amorphous structure
         self.Nsites = int(self.Nx * self.Ny)
         if self.x is None and self.y is None:
             list_sites = np.arange(0, self.Nsites)
-            x_crystal, y_crystal = list_sites % self.Nx, list_sites // self.Nx
+            x_crystal = list_sites % self.Nx
+            y_crystal = list_sites // self.Nx
             self.x, self.y = gaussian_point_set_2D(x_crystal, y_crystal, self.w)
-        coords = np.array([self.x, self.y])
+        self.coords = np.array([self.x, self.y])
 
-        # Neighbour tree and accepting/discarding the configuration
-        self.neighbours = KDTree(coords.T).query_ball_point(coords.T, self.r)
-        for i in range(self.Nsites):
-            self.neighbours[i].remove(i)
-            if restrict_connectivity and len(self.neighbours[i]) < 2:
-                raise ValueError('Connectivity of the lattice too low. Trying a different configuration...')
+        # Set up preliminary disorder
+        self.K_onsite = 0.
 
-    def generate_disorder(self, K_onsite=0., K_hopp=0.):
+    def generate_C4symmetric_configuration(self):
+        if self.Nx % 2 != 0:
+            loger_amorphous.error('Number of sites must be even for C4 symmetry')
+            exit()
+        elif self.Ny % 2 != 0:
+            loger_amorphous.error('Number of sites must be even for C4 symmetry')
+            exit()
 
+        # C4 rotation matrices
+        R90 = np.array([[0, -1], [1, 0]])
+        R180 = np.array([[-1, 0], [0, -1]])
+        R270 = np.array([[0, 1], [-1, 0]])
+
+        # C4 mapping in a square lattice
+        list_sites = np.arange(0, self.Nsites)
+        x_crystal, y_crystal = list_sites % self.Nx, list_sites // self.Nx
+        condx = x_crystal > (self.Nx - 1) / 2
+        condy = y_crystal > (self.Ny - 1) / 2
+        cond = condx * condy
+        centering = np.array([0.5 * (self.Nx - 1), 0.5 * (self.Ny - 1)])
+        gen_sites = np.where(cond)[0]
+        gen_coords = [np.array([x_crystal[i], y_crystal[i]]) - centering for i in gen_sites]
+        coords_tl = [R90 @ gen_coords[i]  + centering  for i in range(len(gen_coords))]
+        coords_bl = [R180 @ gen_coords[i] + centering for i in range(len(gen_coords))]
+        coords_br = [R270 @ gen_coords[i] + centering for i in range(len(gen_coords))]
+        sites_tl = [int(coords_tl[i][0] + self.Nx * coords_tl[i][1]) for i in range(len(coords_tl))]
+        sites_bl = [int(coords_bl[i][0] + self.Nx * coords_bl[i][1]) for i in range(len(coords_bl))]
+        sites_br = [int(coords_br[i][0] + self.Nx * coords_br[i][1]) for i in range(len(coords_br))]
+
+        # Changing coordinates of the amorphous sites to fulfill C4 symmetry
+        am_gen_coords = [np.array([self.x[i], self.y[i]]) - centering for i in gen_sites]
+        am_coords_tl = [R90 @  am_gen_coords[i] + centering for i in range(len(am_gen_coords))]
+        am_coords_bl = [R180 @ am_gen_coords[i] + centering for i in range(len(am_gen_coords))]
+        am_coords_br = [R270 @ am_gen_coords[i] + centering for i in range(len(am_gen_coords))]
+        self.x[sites_tl], self.y[sites_tl] = np.array(am_coords_tl)[:, 0], np.array(am_coords_tl)[:, 1]
+        self.x[sites_bl], self.y[sites_bl] = np.array(am_coords_bl)[:, 0], np.array(am_coords_bl)[:, 1]
+        self.x[sites_br], self.y[sites_br] = np.array(am_coords_br)[:, 0], np.array(am_coords_br)[:, 1]
+        self.coords = np.array([self.x, self.y])
+
+    def generate_onsite_disorder(self, K_onsite):
         loger_amorphous.trace('Generating disorder configuration...')
-        self.K_onsite, self.K_hopp = K_onsite, K_hopp
+        self.K_onsite = K_onsite
+        self.onsite_disorder = np.random.uniform(-self.K_onsite, self.K_onsite, self.Nsites)
 
-        # Generate a matrix with diagonal onsite disorder and symmetric (hermitian) hopping disorder
-        aux_diag = np.random.uniform(-self.K_onsite, self.K_onsite, self.Nsites)
-        aux_matrix = np.random.uniform(-self.K_hopp, self.K_hopp, (self.Nsites, self.Nsites))
-        disorder_matrix = np.tril(aux_matrix, k=-1)
-        disorder_matrix = disorder_matrix + disorder_matrix.T
-        disorder_matrix = disorder_matrix + np.diag(aux_diag)
-        self.disorder = disorder_matrix
 
-    def plot_lattice(self, ax):
-
-        # Neighbour links
-        for site in range(self.Nsites):
-            for n in self.neighbours[site]:
-                ax.plot([self.x[site], self.x[n]], [self.y[site], self.y[n]], 'royalblue', linewidth=1, alpha=0.2)
-                ax.text(self.x[n] + 0.1, self.y[n] + 0.1, str(n))
-
-        # Lattice sites
-        ax.scatter(self.x, self.y, color='deepskyblue', s=50)
 
     # Setters and erasers
     def set_configuration(self, x, y):
         self.x, self.y = x, y
 
-    def set_disorder(self, disorder):
-        self.disorder = disorder
+    def set_disorder(self, onsite_disorder, K_onsite):
+        self.K_onsite = K_onsite
+        self.onsite_disorder = onsite_disorder
+
 
     def erase_configuration(self):
         self.x, self.y = None, None
 
     def erase_disorder(self):
-        self.disorder= None
+        self.onsite_disorder= None
+
+    def plot_lattice(self, ax, sitecolor='deepskyblue', linkcolor='blue', alpha_site=1, alpha_link=1):
+
+        # Lattice sites
+        ax.scatter(self.x, self.y, color=sitecolor, s=50, alpha=alpha_site)
+
+        # Neighbour links
+        for site in range(self.Nsites):
+            for n in self.neighbours[site]:
+                ax.plot([self.x[site], self.x[n]], [self.y[site], self.y[n]], color=linkcolor,
+                        alpha=alpha_link, linewidth=1)
+                # ax.text(self.x[n] + 0.1, self.y[n] + 0.1, str(n))
 
