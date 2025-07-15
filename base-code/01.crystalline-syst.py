@@ -103,15 +103,15 @@ loger_main.info(f'Chiral symmetry of rho: {np.allclose(rho @ S + S @ rho, S)}')
 
 # DoS for the zero modes
 site_pos = np.array([site.pos for site in bbh_model.id_by_site])
-state1 = eigenvectors[:, int(0.5 * Nx * Ny * 4)]
-state2 = eigenvectors[:, int(0.5 * Nx * Ny * 4) - 1]
-state3 = eigenvectors[:, int(0.5 * Nx * Ny * 4) + 1]
-state4 = eigenvectors[:, int(0.5 * Nx * Ny * 4) - 2]
+state1 = eigenvectors[:, int(0.5 * Nx * Ny * 4) - 1]
+state2 = eigenvectors[:, int(0.5 * Nx * Ny * 4) - 2]
+state3 = eigenvectors[:, int(0.5 * Nx * Ny * 4)]
+state4 = eigenvectors[:, int(0.5 * Nx * Ny * 4) + 1]
 DoS1 = local_DoS(state1, int(Nx * Ny))
 DoS2 = local_DoS(state2, int(Nx * Ny))
 DoS3 = local_DoS(state3, int(Nx * Ny))
 DoS4 = local_DoS(state4, int(Nx * Ny))
-DoS_edge = DoS1  + DoS2 + DoS3 + DoS4
+DoS_edge = DoS1 + DoS2  #+ DoS2 + DoS3 + DoS4
 
 #%% Main: Local marker an OPDM
 
@@ -140,7 +140,7 @@ theta_op = np.kron(theta, np.eye(4))
 
 # Mode and shell invariants
 band_flat_rho_red2 = band_flat_rho_red @ band_flat_rho_red
-Imode_op = 4 * C @ (band_flat_rho_red - band_flat_rho_red2) @ theta_op
+Imode_op = 4 * C @ (band_flat_rho_red - band_flat_rho_red2)  @ theta_op
 Ishell_op = - 2 * C @ band_flat_rho_red @ (band_flat_rho_red @ theta_op - theta_op @ band_flat_rho_red)
 Imode_marker = np.real([np.trace(Imode_op[4 * i: 4 * i + 4, 4 * i: 4 * i + 4]) for i in range(Nred)])
 Ishell_marker = np.real([np.trace(Ishell_op[4 * i: 4 * i + 4, 4 * i: 4 * i + 4]) for i in range(Nred)])

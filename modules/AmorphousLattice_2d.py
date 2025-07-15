@@ -75,7 +75,7 @@ class AmorphousLattice_2d:
 
     # Methods for building the lattice
     def build_lattice(self, C4symmetry=False):
-        if self.w < 1e-10:
+        if self.w  < 1e-10:
             loger_amorphous.error('The amorphicity cannot be strictly 0')
             exit()
         self.generate_configuration()
@@ -165,6 +165,7 @@ class AmorphousLattice_2d:
         self.onsite_disorder= None
 
     def plot_lattice(self, ax, sitecolor='deepskyblue', linkcolor='blue', alpha_site=1, alpha_link=1):
+
 
         # Lattice sites
         ax.scatter(self.x, self.y, color=sitecolor, s=50, alpha=alpha_site)
