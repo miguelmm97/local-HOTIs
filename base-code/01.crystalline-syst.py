@@ -24,7 +24,7 @@ from colorlog import ColoredFormatter
 from modules.functions import *
 from modules.AmorphousLattice_2d import AmorphousLattice_2d
 from modules.AmorphousLattice_C4 import AmorphousLattice_C4
-from modules.Hamiltonian_Kwant import spectrum, local_DoS, Hamiltonian_Kwant, reduced_OPDM
+from modules.Hamiltonian_Kwant import spectrum, local_DoS, Hamiltonian_Kwant, reduced_OPDM, chiral_OPDM, OPDM
 from modules.colorbar_marker import get_continuous_cmap
 
 #%% Logging setup
@@ -52,10 +52,8 @@ formatter = ColoredFormatter(
 stream_handler.setFormatter(formatter)
 loger_main.addHandler(stream_handler)
 
-
-
 #%% Variables
-gamma             = 0.5
+gamma             = 0.1
 lamb              = 1
 width             = 0.0000001
 r                 = 1.3
@@ -90,15 +88,17 @@ loger_main.info('Lattice promoted to Kwant successfully.')
 loger_main.info('Calculating Hamiltonian and spectrum:')
 bbh_model = Hamiltonian_Kwant(lattice, params_dict).finalized()
 H = bbh_model.hamiltonian_submatrix()
-eps, eigenvectors, rho = spectrum(H)
+eps, eigenvectors = spectrum(H)
+
+# Chiral symmetry and OPDM
+S = np.kron(np.eye(Nsites), np.kron(tau_z, sigma_0))
+loger_main.info(f'Chiral symmetry of H: {np.allclose(S @ H @ S, -H)}')
+# rho = chiral_OPDM(eps, eigenvectors, S, filling=0.5, dim_zero_subspace=4)
+rho = OPDM(eigenvectors, filling=0.5)
 rho_values, rho_vecs = np.linalg.eigh(rho)
 idx = rho_values.argsort()
 rho_values = rho_values[idx]
 rho_vecs = rho_vecs[:, idx]
-
-# Symmetry checks
-S = np.kron(np.eye(Nsites), np.kron(tau_z, sigma_0))
-loger_main.info(f'Chiral symmetry of H: {np.allclose(S @ H @ S, -H)}')
 loger_main.info(f'Chiral symmetry of rho: {np.allclose(rho @ S + S @ rho, S)}')
 
 # DoS for the zero modes
@@ -137,6 +137,7 @@ for i in range(Nred):
     r = np.sqrt(x ** 2 + y ** 2)
     theta[i, i] = theta_func(r, center_theta, sharpness_theta)
 theta_op = np.kron(theta, np.eye(4))
+loger_main.info(f'Chiral symmetry of rho_reduced: {np.allclose(rho_red @ C + C @ rho_red, C)}')
 
 # Mode and shell invariants
 band_flat_rho_red2 = band_flat_rho_red @ band_flat_rho_red

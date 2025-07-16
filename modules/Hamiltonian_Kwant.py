@@ -4,6 +4,8 @@
 from numpy import pi
 import numpy as np
 from scipy.integrate import quad
+from qutip import Qobj
+import scipy.linalg as la
 
 # Kwant
 import kwant
@@ -114,12 +116,48 @@ def spectrum(H, Nsp=None):
     eigenstates = eigenstates[:, idx]
 
     # OPDM
-    loger_kwant.info('Calculating OPDM...')
-    U = np.zeros((len(H), len(H)), dtype=np.complex128)
-    U[:, 0: Nsp] = eigenstates[:, 0: Nsp]
-    rho = U @ np.conj(np.transpose(U))
+    # loger_kwant.info('Calculating OPDM...')
+    # U = np.zeros((len(H), len(H)), dtype=np.complex128)
+    # U[:, 0: Nsp] = eigenstates[:, 0: Nsp]
+    # rho = U @ np.conj(np.transpose(U))
 
-    return energy, eigenstates, rho
+    return energy, eigenstates
+
+def OPDM(eigenvectors, filling=0.5):
+    # OPDM
+    loger_kwant.info('Calculating OPDM...')
+    dim = eigenvectors.shape[0]
+    Nsp = int(dim * filling)
+    U = np.zeros((dim, dim), dtype=np.complex128)
+    U[:, 0: Nsp] = eigenvectors[:, 0: Nsp]
+    rho = U @ np.conj(np.transpose(U))
+    return rho
+
+def chiral_OPDM(eigenvalues, eigenvectors, S, filling=0.5, dim_zero_subspace=4):
+
+    # Select the subspace of zero modes
+    dim = eigenvectors.shape[0]
+    index0 = int(0.5 * dim_zero_subspace)
+    zero_modes = eigenvectors[:, int(0.5 * dim) - index0: int(0.5 * dim) + index0]
+    H0 = zero_modes @ np.diag(eigenvalues[int(0.5 * dim) - 2: int(0.5 * dim) + 2]) @ zero_modes.T.conj()
+    H0_2 = H0 @ H0
+
+    # Simultaneous diagonalization
+    loger_kwant.info('Diagonalizing H^2 and S in the zero subspace')
+    H0_2q, Sq = Qobj(H0_2), Qobj(S)
+    print((H0_2q * Sq - Sq * H0_2q).norm() / (H0_2q * Sq).norm())
+    _, U = simdiag([H0_2q, Sq], tol=1e-8)
+    U = U.full()
+    chiral_zero_modes = U @ zero_modes
+    eigenvectors[:, int(0.5 * dim) - 2: int(0.5 * dim) + 2] = chiral_zero_modes
+
+    # OPDM
+    loger_kwant.info('Calculating OPDM...')
+    Nsp = int(dim * filling)
+    U = np.zeros((dim, dim), dtype=np.complex128)
+    U[:, 0: Nsp] = eigenvectors[:, 0: Nsp]
+    rho = U @ np.conj(np.transpose(U))
+    return rho
 
 def reduced_OPDM(rho, site_indices, Nsp=None):
 
@@ -236,3 +274,115 @@ def Hamiltonian_Kwant(lattice_tree, param_dict):
     return syst
 
 
+# Simultaneous diagonalization functions (fork from qutip
+def simdiag(ops, tol=1e-14, evals=True):
+    """Simulateous diagonalization of communting Hermitian matrices..
+
+    Parameters
+    ----------
+    ops : list/array
+        ``list`` or ``array`` of qobjs representing commuting Hermitian
+        operators.
+
+    Returns
+    --------
+    eigs : tuple
+        Tuple of arrays representing eigvecs and eigvals of quantum objects
+        corresponding to simultaneous eigenvectors and eigenvalues for each
+        operator.
+
+    """
+    start_flag = 0
+    if not any(ops):
+        raise ValueError('Need at least one input operator.')
+    if not isinstance(ops, (list, np.ndarray)):
+        ops = np.array([ops])
+    num_ops = len(ops)
+    for jj in range(num_ops):
+        A = ops[jj]
+        shape = A.shape
+        if shape[0] != shape[1]:
+            raise TypeError('Matricies must be square.')
+        if start_flag == 0:
+            s = shape[0]
+        if s != shape[0]:
+            raise TypeError('All matrices. must be the same shape')
+        if not A.isherm:
+            raise TypeError('Matricies must be Hermitian')
+        for kk in range(jj):
+            B = ops[kk]
+            if (A * B - B * A).norm() / (A * B).norm() > tol:
+                raise TypeError('Matricies must commute.')
+
+    A = ops[0]
+    eigvals, eigvecs = la.eig(A.full())
+    zipped = zip(-eigvals, range(len(eigvals)))
+    zipped.sort()
+    ds, perm = zip(*zipped)
+    ds = -np.real(np.array(ds))
+    perm = np.array(perm)
+    eigvecs_array = np.array(
+        [np.zeros((A.shape[0], 1), dtype=complex) for k in range(A.shape[0])])
+
+    for kk in range(len(perm)):  # matrix with sorted eigvecs in columns
+        eigvecs_array[kk][:, 0] = eigvecs[:, perm[kk]]
+    k = 0
+    rng = np.arange(len(eigvals))
+    while k < len(ds):
+        # find degenerate eigenvalues, get indicies of degenerate eigvals
+        inds = np.array(abs(ds - ds[k]) < max(tol, tol * abs(ds[k])))
+        inds = rng[inds]
+        if len(inds) > 1:  # if at least 2 eigvals are degenerate
+            eigvecs_array[inds] = degen(
+                tol, eigvecs_array[inds],
+                np.array([ops[kk] for kk in range(1, num_ops)]))
+        k = max(inds) + 1
+    eigvals_out = np.zeros((num_ops, len(ds)), dtype=float)
+    kets_out = np.array([Qobj(eigvecs_array[j] / la.norm(eigvecs_array[j]),
+                              dims=[ops[0].dims[0], [1]],
+                              shape=[ops[0].shape[0], 1])
+                         for j in range(len(ds))])
+    if not evals:
+        return kets_out
+    else:
+        for kk in range(num_ops):
+            for j in range(len(ds)):
+                eigvals_out[kk, j] = np.real(np.dot(
+                    eigvecs_array[j].conj().T,
+                    ops[kk].data * eigvecs_array[j]))
+        return eigvals_out, kets_out
+
+def degen(tol, in_vecs, ops):
+    """
+    Private function that finds eigen vals and vecs for degenerate matrices..
+    """
+    n = len(ops)
+    if n == 0:
+        return in_vecs
+    A = ops[0]
+    vecs = np.column_stack(in_vecs)
+    eigvals, eigvecs = la.eig(np.dot(vecs.conj().T, A.data.dot(vecs)))
+    zipped = zip(-eigvals, range(len(eigvals)))
+    zipped.sort()
+    ds, perm = zip(*zipped)
+    ds = -np.real(np.array(ds))
+    perm = np.array(perm)
+    vecsperm = np.zeros(eigvecs.shape, dtype=complex)
+    for kk in range(len(perm)):  # matrix with sorted eigvecs in columns
+        vecsperm[:, kk] = eigvecs[:, perm[kk]]
+    vecs_new = np.dot(vecs, vecsperm)
+    vecs_out = np.array(
+        [np.zeros((A.shape[0], 1), dtype=complex) for k in range(len(ds))])
+    for kk in range(len(perm)):  # matrix with sorted eigvecs in columns
+        vecs_out[kk][:, 0] = vecs_new[:, kk]
+    k = 0
+    rng = np.arange(len(ds))
+    while k < len(ds):
+        inds = np.array(abs(ds - ds[k]) < max(
+            tol, tol * abs(ds[k])))  # get indicies of degenerate eigvals
+        inds = rng[inds]
+        if len(inds) > 1:  # if at least 2 eigvals are degenerate
+            vecs_out[inds] = degen(tol, vecs_out[inds],
+                                   np.array([ops[jj] for jj in range(1, n)]))
+        k = max(inds) + 1
+    return vecs_out

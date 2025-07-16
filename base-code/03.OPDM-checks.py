@@ -55,12 +55,12 @@ loger_main.addHandler(stream_handler)
 
 
 #%% Variables
-gamma             = 0.5
+gamma             = 0.1
 lamb              = 1
 width             = 0.0000001
 r                 = 1.3
-Nx                = 30
-Ny                = 30
+Nx                = 20
+Ny                = 20
 Nsites            = Nx * Ny
 cutx, cuty        = 0.5 * Nx, 0.5 * Ny
 center_theta      = cutx / 2
