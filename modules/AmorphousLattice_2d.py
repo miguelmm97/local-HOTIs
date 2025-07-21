@@ -74,11 +74,11 @@ class AmorphousLattice_2d:
 
 
     # Methods for building the lattice
-    def build_lattice(self, C4symmetry=False):
-        if self.w  < 1e-10:
+    def build_lattice(self, crystalline=False, C4symmetry=False):
+        if self.w < 1e-10 and not crystalline:
             loger_amorphous.error('The amorphicity cannot be strictly 0')
             exit()
-        self.generate_configuration()
+        self.generate_configuration(crystalline=crystalline)
         if C4symmetry:
             self.generate_C4symmetric_configuration()
         self.generate_neighbour_tree()
@@ -88,7 +88,7 @@ class AmorphousLattice_2d:
         for i in range(self.Nsites):
             self.neighbours[i].remove(i)
 
-    def generate_configuration(self):
+    def generate_configuration(self, crystalline=False):
         loger_amorphous.trace('Generating lattice and neighbour tree...')
 
         # Positions of x and y coordinates on the amorphous structure
@@ -97,7 +97,10 @@ class AmorphousLattice_2d:
             list_sites = np.arange(0, self.Nsites)
             x_crystal = list_sites % self.Nx
             y_crystal = list_sites // self.Nx
-            self.x, self.y = gaussian_point_set_2D(x_crystal, y_crystal, self.w)
+            if crystalline:
+                self.x, self.y = x_crystal, y_crystal
+            else:
+                self.x, self.y = gaussian_point_set_2D(x_crystal, y_crystal, self.w)
         self.coords = np.array([self.x, self.y])
 
         # Set up preliminary disorder
@@ -146,8 +149,6 @@ class AmorphousLattice_2d:
         loger_amorphous.trace('Generating disorder configuration...')
         self.K_onsite = K_onsite
         self.onsite_disorder = np.random.uniform(-self.K_onsite, self.K_onsite, self.Nsites)
-
-
 
     # Setters and erasers
     def set_configuration(self, x, y):

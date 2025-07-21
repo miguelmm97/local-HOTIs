@@ -23,7 +23,6 @@ from colorlog import ColoredFormatter
 # Modules
 from modules.functions import *
 from modules.AmorphousLattice_2d import AmorphousLattice_2d
-from modules.AmorphousLattice_C4 import AmorphousLattice_C4
 from modules.Hamiltonian_Kwant import spectrum, local_DoS, Hamiltonian_Kwant, OPDM, reduced_OPDM
 from modules.colorbar_marker import get_continuous_cmap
 
@@ -53,9 +52,9 @@ stream_handler.setFormatter(formatter)
 loger_main.addHandler(stream_handler)
 
 #%% Variables
-gamma             = 0.0
+gamma             = 0.
 lamb              = 1
-width             = 0.0000001
+width             = 0.1
 r                 = 1.3
 Nx                = 20
 Ny                = 20
@@ -64,6 +63,8 @@ cutx, cuty        = 0.5 * Nx, 0.5 * Ny
 center_theta      = cutx / 2
 sharpness_theta   = 1 * center_theta
 params_dict = {'gamma': gamma, 'lamb': lamb}
+crystalline = True
+C4symmetry = False
 
 # Sigma matrices
 sigma_0 = np.eye(2, dtype=np.complex128)
@@ -81,7 +82,7 @@ def theta_func(x, b, a):
 # Lattice
 loger_main.info('Generating fully amorphous lattice...')
 lattice = AmorphousLattice_2d(Nx=Nx, Ny=Ny, w=width, r=r)
-lattice.build_lattice()
+lattice.build_lattice(crystalline=crystalline, C4symmetry=C4symmetry)
 loger_main.info('Lattice promoted to Kwant successfully.')
 
 # Spectrum of the closed system
@@ -110,7 +111,7 @@ DoS1 = local_DoS(state1, int(Nx * Ny))
 DoS2 = local_DoS(state2, int(Nx * Ny))
 DoS3 = local_DoS(state3, int(Nx * Ny))
 DoS4 = local_DoS(state4, int(Nx * Ny))
-DoS_edge = DoS1 + DoS2 #+ DoS3 + DoS4
+DoS_edge = DoS1 + DoS2 + DoS3 + DoS4
 
 #%% Main: Local marker an OPDM
 
