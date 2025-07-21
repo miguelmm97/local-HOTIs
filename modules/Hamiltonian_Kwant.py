@@ -103,63 +103,32 @@ def hopping(lamb, d, phi, cutoff_dist):
     hopp_y = - 0.5 * lamb * np.abs(np.sin(phi)) * (np.kron(sigma_y, tau_y) + 1j * np.kron(sigma_y, tau_x))
     return f_cutoff * (hopp_x + hopp_y)
 
-def spectrum(H, Nsp=None):
-
-    if Nsp is None:
-        Nsp = int(len(H) / 2)
-
-    # Spectrum
+def spectrum(H):
     loger_kwant.info('Calculating eigenstates...')
     energy, eigenstates = np.linalg.eigh(H)
     idx = energy.argsort()
     energy = energy[idx]
     eigenstates = eigenstates[:, idx]
-
-    # OPDM
-    # loger_kwant.info('Calculating OPDM...')
-    # U = np.zeros((len(H), len(H)), dtype=np.complex128)
-    # U[:, 0: Nsp] = eigenstates[:, 0: Nsp]
-    # rho = U @ np.conj(np.transpose(U))
-
     return energy, eigenstates
 
-def OPDM(eigenvectors, filling=0.5):
-    # OPDM
+def OPDM(eigenvectors, filling=0.5, enforce_chiral_sym=False, S=None):
+
     loger_kwant.info('Calculating OPDM...')
     dim = eigenvectors.shape[0]
     Nsp = int(dim * filling)
     U = np.zeros((dim, dim), dtype=np.complex128)
     U[:, 0: Nsp] = eigenvectors[:, 0: Nsp]
     rho = U @ np.conj(np.transpose(U))
-    return rho
 
-def chiral_OPDM(eigenvalues, eigenvectors, S, filling=0.5, dim_zero_subspace=4):
+    if enforce_chiral_sym:
+        if S is not None:
+            return 0.5 * (rho + np.eye(rho.shape[0]) - S @ rho @ S)
+        else:
+            raise ValueError('Need to specify S in order to enforce chiral symmetry.')
+    else:
+        return rho
 
-    # Select the subspace of zero modes
-    dim = eigenvectors.shape[0]
-    index0 = int(0.5 * dim_zero_subspace)
-    zero_modes = eigenvectors[:, int(0.5 * dim) - index0: int(0.5 * dim) + index0]
-    H0 = zero_modes @ np.diag(eigenvalues[int(0.5 * dim) - 2: int(0.5 * dim) + 2]) @ zero_modes.T.conj()
-    H0_2 = H0 @ H0
-
-    # Simultaneous diagonalization
-    loger_kwant.info('Diagonalizing H^2 and S in the zero subspace')
-    H0_2q, Sq = Qobj(H0_2), Qobj(S)
-    print((H0_2q * Sq - Sq * H0_2q).norm() / (H0_2q * Sq).norm())
-    _, U = simdiag([H0_2q, Sq], tol=1e-8)
-    U = U.full()
-    chiral_zero_modes = U @ zero_modes
-    eigenvectors[:, int(0.5 * dim) - 2: int(0.5 * dim) + 2] = chiral_zero_modes
-
-    # OPDM
-    loger_kwant.info('Calculating OPDM...')
-    Nsp = int(dim * filling)
-    U = np.zeros((dim, dim), dtype=np.complex128)
-    U[:, 0: Nsp] = eigenvectors[:, 0: Nsp]
-    rho = U @ np.conj(np.transpose(U))
-    return rho
-
-def reduced_OPDM(rho, site_indices, Nsp=None):
+def reduced_OPDM(rho, site_indices):
 
     Nred = len(site_indices) * 4
     rho_red = np.zeros((Nred, Nred), dtype=np.complex128)
@@ -181,9 +150,17 @@ def local_DoS(state, Nsites):
     if np.sum(np.imag(local_DoS)) < 1e-10:
         local_DoS = np.real(local_DoS)
     else:
-        raise ValueError('DoS is complex.')
+        raise TypeError('DoS is complex.')
 
     return local_DoS
+
+def occupied_zero_energy_DoS(rho_eigvecs, H, Nsites, tol=1e-5, filling=0.5):
+    zero_energy_Dos = np.zeros((Nsites, ), dtype=np.float64)
+    for i in range(int(H.shape[0] * filling)):
+        if np.allclose(np.abs(H @ rho_eigvecs[:, i]), np.zeros((H.shape[0], ), dtype=np.float64), atol=tol):
+            zero_energy_Dos += local_DoS(rho_eigvecs[:, i], Nsites)
+    return zero_energy_Dos
+
 
 def bbh_hamiltonian(lattice, param_dict):
 

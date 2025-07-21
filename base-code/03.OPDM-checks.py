@@ -24,7 +24,7 @@ from colorlog import ColoredFormatter
 from modules.functions import *
 from modules.AmorphousLattice_2d import AmorphousLattice_2d
 from modules.AmorphousLattice_C4 import AmorphousLattice_C4
-from modules.Hamiltonian_Kwant import spectrum, local_DoS, Hamiltonian_Kwant, reduced_OPDM
+from modules.Hamiltonian_Kwant import spectrum, local_DoS, Hamiltonian_Kwant, reduced_OPDM, OPDM, occupied_zero_energy_DoS
 from modules.colorbar_marker import get_continuous_cmap
 
 #%% Logging setup
@@ -55,7 +55,7 @@ loger_main.addHandler(stream_handler)
 
 
 #%% Variables
-gamma             = 0.1
+gamma             = 0.3
 lamb              = 1
 width             = 0.0000001
 r                 = 1.3
@@ -86,11 +86,21 @@ lattice = AmorphousLattice_2d(Nx=Nx, Ny=Ny, w=width, r=r)
 lattice.build_lattice()
 loger_main.info('Lattice promoted to Kwant successfully.')
 
-# Spectrum of the closed system
+# Spectrum of the closed system and OPDM
 loger_main.info('Calculating Hamiltonian and spectrum:')
 bbh_model = Hamiltonian_Kwant(lattice, params_dict).finalized()
 H = bbh_model.hamiltonian_submatrix()
-eps, eigenvectors, rho = spectrum(H)
+eps, eigenvectors = spectrum(H)
+
+# OPDM and spectrum
+S = np.kron(np.eye(Nsites), np.kron(tau_z, sigma_0))
+rho = OPDM(eigenvectors, filling=0.5, enforce_chiral_sym=True, S=S)
+rho_values, rho_vecs = np.linalg.eigh(rho)
+idx = rho_values.argsort()
+rho_values = rho_values[idx]
+rho_vecs = rho_vecs[:, idx]
+loger_main.info(f'Chiral symmetry of H: {np.allclose(S @ H @ S, -H)}')
+loger_main.info(f'Chiral symmetry of rho: {np.allclose(rho @ S + S @ rho, S)}')
 
 # Cut of the system around one corner
 site_pos = np.array([site.pos for site in bbh_model.id_by_site])
@@ -105,13 +115,11 @@ rho_red = reduced_OPDM(rho, indices)
 rho_red_values, rho_red_vecs = np.linalg.eigh(rho_red)
 idx = rho_red_values.argsort()
 rho_red_values, rho_red_vecs = rho_red_values[idx],  rho_red_vecs[:, idx]
-
-
-
-
-# Theta and chiral symmetry for the reduced OPDM
-S = np.kron(np.eye(Nsites), np.kron(tau_z, sigma_0))
 C = np.kron(np.eye(Nred), np.kron(tau_z, sigma_0))
+loger_main.info(f'Chiral symmetry of rho_reduced: {np.allclose(rho_red @ C + C @ rho_red, C)}')
+
+
+# Theta operator
 theta = np.zeros((Nred, Nred))
 for i in range(Nred):
     x, y = lattice.x[indices[i]], lattice.y[indices[i]]
@@ -132,6 +140,7 @@ E1 = eps[int(0.5 * Nx * Ny * 4) - 1]
 E2 = eps[int(0.5 * Nx * Ny * 4) - 2]
 E3 = eps[int(0.5 * Nx * Ny * 4)]
 E4 = eps[int(0.5 * Nx * Ny * 4) + 1]
+occupied_zero_Dos = occupied_zero_energy_DoS(rho_vecs, H, Nsites)
 
 
 # Eigenstates of the reduced OPDM
@@ -147,7 +156,6 @@ lambda1 = rho_red_values[int(0.5 * Nred * 4) - 2]
 lambda2 = rho_red_values[int(0.5 * Nred * 4) - 1]
 lambda3 = rho_red_values[int(0.5 * Nred * 4) ]
 lambda4 = rho_red_values[int(0.5 * Nred * 4) + 1]
-print(state2.T.conj() @ (theta_op @ state2))
 
 
 
@@ -232,12 +240,19 @@ fig1.colorbar(colormap, cax=cax, orientation='vertical')
 
 
 fig2 = plt.figure()
-gs = GridSpec(1, 1, figure=fig1, wspace=0.5, hspace=0.5)
+gs = GridSpec(1, 1, figure=fig2, wspace=0.5, hspace=0.5)
 ax0 = fig2.add_subplot(gs[0, 0])
-
 ax0.plot(np.arange(len(rho_red_values)), rho_red_values, marker='o', color='mediumslateblue', linestyle='None', markersize=2)
 ax0.set_xlabel('Eigenstates', fontsize=fontsize)
 ax0.set_ylabel('$\\rho(\\theta)$', fontsize=fontsize)
 ax0.set_title('OPDM', fontsize=fontsize)
+
+
+fig3 = plt.figure(figsize=(5, 5))
+gs = GridSpec(1, 1, figure=fig3, wspace=0.5, hspace=0.5)
+ax0 = fig3.add_subplot(gs[0, 0])
+ax0.scatter(site_pos[:, 0], site_pos[:, 1], c=occupied_zero_Dos, cmap=color_map, edgecolor='black', vmin=min_value, vmax=max_value)
+ax0.set_axis_off()
+ax0.set_title(f'Occupied DoS at zero energy', fontsize=fontsize)
 
 plt.show()
