@@ -52,12 +52,12 @@ stream_handler.setFormatter(formatter)
 loger_main.addHandler(stream_handler)
 
 #%% Variables
-gamma             = 0.
+gamma             = 0.5
 lamb              = 1
-width             = 0.1
+width             = 0.
 r                 = 1.3
-Nx                = 20
-Ny                = 20
+Nx                = 25
+Ny                = 25
 Nsites            = Nx * Ny
 cutx, cuty        = 0.5 * Nx, 0.5 * Ny
 center_theta      = cutx / 2
@@ -76,6 +76,7 @@ tau_0, tau_x, tau_y, tau_z = sigma_0, sigma_x, sigma_y, sigma_z
 # Thea function for selecting a single corner
 def theta_func(x, b, a):
     return 1 - 1 / (1 + np.exp(-a * (x - b)))
+
 
 #%% Main: System
 
@@ -149,7 +150,53 @@ loger_main.info(f'Ishell: {np.sum(Ishell_marker)}')
 loger_main.info(f'Ishell = Imode: {np.allclose(np.sum(Imode_marker), np.sum(Ishell_marker))}')
 
 
+# %% Saving data
+data_dir = '../data'
+file_list = os.listdir(data_dir)
+expID = get_fileID(file_list, common_name='Exp')
+filename = '{}{}{}'.format('Exp', expID, '.h5')
+filepath = os.path.join(data_dir, filename)
+
+with h5py.File(filepath, 'w') as f:
+
+    # Simulation folder
+    simulation = f.create_group('Simulation')
+    store_my_data(simulation, 'x', lattice.x)
+    store_my_data(simulation, 'y', lattice.y)
+    store_my_data(simulation, 'site_pos', site_pos)
+    store_my_data(simulation, 'A_indices', indices)
+    store_my_data(simulation, 'Hval', eps)
+    store_my_data(simulation, 'Hvec', eigenvectors)
+    store_my_data(simulation, 'rhoval', rho_values)
+    store_my_data(simulation, 'rhovec', rho_vecs)
+    store_my_data(simulation, 'rhoredval', rho_red_values)
+    store_my_data(simulation,'rhoredvec', rho_red_vecs)
+    store_my_data(simulation, 'theta', theta)
+    store_my_data(simulation, 'Imode', Imode_marker)
+    store_my_data(simulation, 'Ishell', Ishell_marker)
+
+    # Parameters folder
+    parameters = f.create_group('Parameters')
+    store_my_data(parameters, 'width', width)
+    store_my_data(parameters, 'Nx', Nx)
+    store_my_data(parameters, 'Ny', Ny)
+    store_my_data(parameters, 'r', r)
+    store_my_data(parameters, 'gamma', gamma)
+    store_my_data(parameters, 'lamb', lamb)
+    store_my_data(parameters, 'cutx', cutx)
+    store_my_data(parameters, 'cuty', cuty)
+    store_my_data(parameters, 'center_theta', center_theta)
+    store_my_data(parameters, 'sharpness_theta', sharpness_theta)
+    store_my_data(parameters, 'crystalline', crystalline)
+    store_my_data(parameters, 'C4symmetry', C4symmetry)
+
+loger_main.info('Data saved correctly')
+
+
+
+
 #%% Figures
+
 # Style sheet
 font = {'family': 'serif', 'color': 'black', 'weight': 'normal', 'size': 22, }
 plt.rc('text', usetex=True)
