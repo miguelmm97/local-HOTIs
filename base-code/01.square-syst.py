@@ -54,17 +54,17 @@ loger_main.addHandler(stream_handler)
 #%% Variables
 gamma             = 0.5
 lamb              = 1
-width             = 0.
+width             = 0.1
 r                 = 1.3
-Nx                = 25
-Ny                = 25
+Nx                = 20
+Ny                = 20
 Nsites            = Nx * Ny
 cutx, cuty        = 0.5 * Nx, 0.5 * Ny
-center_theta      = cutx / 2
+center_theta      = 1 * cutx / 2
 sharpness_theta   = 1 * center_theta
 params_dict = {'gamma': gamma, 'lamb': lamb}
-crystalline = True
-C4symmetry = False
+crystalline = False
+C4symmetry = True
 
 # Sigma matrices
 sigma_0 = np.eye(2, dtype=np.complex128)
@@ -104,15 +104,15 @@ loger_main.info(f'Chiral symmetry of rho: {np.allclose(rho @ S + S @ rho, S)}')
 
 # DoS for the zero modes
 site_pos = np.array([site.pos for site in bbh_model.id_by_site])
-state1 = eigenvectors[:, int(0.5 * Nx * Ny * 4) - 2]
+state1 = eigenvectors[:, int(0.5 * Nx * Ny * 4) - 3]
 state2 = eigenvectors[:, int(0.5 * Nx * Ny * 4) - 1]
 state3 = eigenvectors[:, int(0.5 * Nx * Ny * 4)]
-state4 = eigenvectors[:, int(0.5 * Nx * Ny * 4) + 1]
+state4 = eigenvectors[:, int(0.5 * Nx * Ny * 4) + 2]
 DoS1 = local_DoS(state1, int(Nx * Ny))
 DoS2 = local_DoS(state2, int(Nx * Ny))
 DoS3 = local_DoS(state3, int(Nx * Ny))
 DoS4 = local_DoS(state4, int(Nx * Ny))
-DoS_edge = DoS1 + DoS2 + DoS3 + DoS4
+DoS_edge = DoS4 #+ DoS2 + DoS3 + DoS4
 
 #%% Main: Local marker an OPDM
 
@@ -191,100 +191,3 @@ with h5py.File(filepath, 'w') as f:
     store_my_data(parameters, 'C4symmetry', C4symmetry)
 
 loger_main.info('Data saved correctly')
-
-
-
-
-#%% Figures
-
-# Style sheet
-font = {'family': 'serif', 'color': 'black', 'weight': 'normal', 'size': 22, }
-plt.rc('text', usetex=True)
-plt.rc('font', family='serif')
-color_list = ['limegreen', 'dodgerblue', 'm', 'r', 'orange']
-markersize = 5
-fontsize = 20
-site_size  = 0.3
-site_lw    = 0.00
-site_color = 'orangered'
-hop_color  = 'royalblue'
-hop_lw     = 0.1
-lead_color = 'royalblue'
-
-# Defining a colormap for the DoS
-max_value, min_value = np.max(DoS2), np.min(DoS2)
-color_map = plt.get_cmap("magma").reversed()
-colors = color_map(np.linspace(0, 1, 20))
-colors[0] = [1, 1, 1, 1]
-color_map = LinearSegmentedColormap.from_list("custom_colormap", colors)
-colormap = cm.ScalarMappable(norm=Normalize(vmin=min_value, vmax=max_value), cmap=color_map)
-
-
-# Mode invariant
-divnorm = mcolors.TwoSlopeNorm(vmin=-1, vcenter=0, vmax=1)
-hex_list = ['#ff416d', '#ff7192', '#ffa0b6', '#ffd0db', '#ffffff', '#cfdaff', '#9fb6ff', '#6f91ff', '#3f6cff']
-cmap = get_continuous_cmap(hex_list)
-colormap_marker = cm.ScalarMappable(norm=divnorm, cmap=cmap)
-
-
-fig5 = plt.figure(figsize=(12, 6))
-gs = GridSpec(2, 3, figure=fig5, wspace=0.5, hspace=0.5)
-ax0 = fig5.add_subplot(gs[0, 0])
-ax1 = fig5.add_subplot(gs[0, 1])
-ax2 = fig5.add_subplot(gs[0, 2])
-ax3 = fig5.add_subplot(gs[1, 0])
-ax4 = fig5.add_subplot(gs[1, 1])
-ax5 = fig5.add_subplot(gs[1, 2])
-
-# Energy spectrum
-ax5.plot(np.arange(len(eps)), eps, marker='o', color='mediumslateblue', linestyle='None', markersize=1)
-ax5.set_xlabel('Eigenstates', fontsize=fontsize)
-ax5.set_ylabel('$\epsilon$', fontsize=fontsize)
-ax5.set_title('Energy spectrum', fontsize=fontsize)
-
-# OPDM spectrum
-ax4.plot(np.arange(len(rho_red_values)), rho_red_values, marker='o', color='mediumslateblue', linestyle='None', markersize=2)
-ax4.set_xlabel('Eigenstates', fontsize=fontsize)
-ax4.set_ylabel('$\\rho(\\theta)$', fontsize=fontsize)
-ax4.set_title('OPDM', fontsize=fontsize)
-
-# DoS of the zero modes
-ax3.scatter(site_pos[:, 0], site_pos[:, 1], c=DoS_edge, cmap=color_map, edgecolor='black', vmin=min_value, vmax=max_value)
-ax3.set_axis_off()
-ax3.set_title('DoS$(E\simeq 0)$', fontsize=fontsize)
-divider = make_axes_locatable(ax3)
-cax = divider.append_axes("right", size="5%", pad=0.1)
-fig5.colorbar(colormap, cax=cax, orientation='vertical')
-
-
-# Theta
-sc = ax0.scatter(site_pos[indices, 0], site_pos[indices, 1], c=np.diag(theta), cmap=color_map, edgecolor='black', s=200)
-ax0.set_axis_off()
-ax0.set_title('$\\theta(r)$', fontsize=fontsize)
-ax0.set_xlim(-1, Nx/3 + 0.8)
-ax0.set_ylim(-1, Ny/3 + 0.8)
-divider = make_axes_locatable(ax0)
-cax = divider.append_axes("right", size="5%", pad=0.1)
-fig5.colorbar(colormap, cax=cax, orientation='vertical')
-
-
-sc = ax1.scatter(site_pos[indices, 0], site_pos[indices, 1], c=Imode_marker, cmap=cmap, norm=divnorm, edgecolors='black', s=200)
-ax1.set_axis_off()
-ax1.set_title('$\mathcal{I}_{mode}=$' + f'${np.sum(Imode_marker) :.2f}$', fontsize=fontsize)
-ax1.set_xlim(-1, Nx/3 + 0.8)
-ax1.set_ylim(-1, Ny/3 + 0.8)
-
-sc = ax2.scatter(site_pos[indices, 0], site_pos[indices, 1], c=Ishell_marker, cmap=cmap, norm=divnorm, edgecolors='black', s=200)
-ax2.set_axis_off()
-ax2.set_title('$\mathcal{I}_{shell}=$' + f'${np.sum(Ishell_marker) :.2f}$', fontsize=fontsize)
-ax2.set_xlim(-1, Nx/3 + 0.8)
-ax2.set_ylim(-1, Ny/3 + 0.8)
-
-# Add colorbar using divider
-divider = make_axes_locatable(ax2)
-cax = divider.append_axes("right", size="5%", pad=0.1)
-fig5.colorbar(colormap_marker, cax=cax, orientation='vertical')
-
-
-# fig5.savefig('fig1.pdf', format='pdf')
-plt.show()

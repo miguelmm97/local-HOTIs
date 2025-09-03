@@ -23,7 +23,6 @@ from colorlog import ColoredFormatter
 # Modules
 from modules.functions import *
 from modules.AmorphousLattice_2d import AmorphousLattice_2d
-from modules.AmorphousLattice_C4 import AmorphousLattice_C4
 from modules.Hamiltonian_Kwant import spectrum, local_DoS, Hamiltonian_Kwant, reduced_OPDM, OPDM, occupied_zero_energy_DoS
 from modules.colorbar_marker import get_continuous_cmap
 
@@ -128,10 +127,10 @@ for i in range(Nred):
 theta_op = np.kron(theta, np.eye(4))
 
 # DoS for the corner states
-state1 = eigenvectors[:, int(0.5 * Nx * Ny * 4) - 1]
+state1 = eigenvectors[:, int(0.5 * Nx * Ny * 4) - 3]
 state2 = eigenvectors[:, int(0.5 * Nx * Ny * 4) - 2]
 state3 = eigenvectors[:, int(0.5 * Nx * Ny * 4)]
-state4 = eigenvectors[:, int(0.5 * Nx * Ny * 4) + 1]
+state4 = eigenvectors[:, int(0.5 * Nx * Ny * 4) + 3]
 DoS1_corner = local_DoS(state1, int(Nx * Ny))
 DoS2_corner = local_DoS(state2, int(Nx * Ny))
 DoS3_corner = local_DoS(state3, int(Nx * Ny))

@@ -10,7 +10,10 @@ from matplotlib import cm
 import matplotlib.colors as mcolors
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib.colors import LinearSegmentedColormap, Normalize
-from matplotlib.patches import FancyArrowPatch
+from matplotlib.patches import FancyArrowPatch, Polygon
+import matplotlib.patheffects as path_effects
+import seaborn as sns
+import colorsys
 
 # Kwant
 import kwant
@@ -26,7 +29,7 @@ from modules.colorbar_marker import get_continuous_cmap
 
 
 #%% Loading data
-file_list = ['Exp1.h5']
+file_list = ['Fig2-data.h5']
 data_dict = load_my_data(file_list, '../data')
 
 # Parameters
@@ -71,10 +74,11 @@ DoS_edge = DoS1 + DoS2 + DoS3 + DoS4
 state_red= rhoredvec[:, int(0.5 * len(rhoredval))]
 DoS1_redOPDM = local_DoS(state_red, int(len(rhoredval) * 0.25))
 
-indices_shell = [int(A_indices[i]) for i in range(theta.shape[0]) if 0.05 < theta[i, i] < 0.95]
-
+total_mode = np.sum(Imode_marker)
+total_shell = np.sum(Ishell_marker)
 
 #%% Figures
+
 # Style sheet
 font = {'family': 'serif', 'color': 'black', 'weight': 'normal', 'size': 22, }
 plt.rc('text', usetex=True)
@@ -90,113 +94,157 @@ hop_color  = 'royalblue'
 hop_lw     = 0.1
 lead_color = 'royalblue'
 
-# Defining a colormap for the DoS
-max_value, min_value = np.max(DoS2), np.min(DoS2)
-color_map = plt.get_cmap("magma").reversed()
-colors = color_map(np.linspace(0.1, 1, 100))
-colors[0] = [1, 1, 1, 1]
-color_map = LinearSegmentedColormap.from_list("custom_colormap", colors)
-
-norm_DoS = Normalize(vmin=min_value, vmax=max_value)
+# Colormap for the DoS
+max_DoS, min_DoS = np.max(DoS2), np.min(DoS2)
+palette_DoS = sns.color_palette("mako_r", as_cmap=True)
+colors_DoS = palette_DoS(np.linspace(0.1, 1, 100))
+colors_DoS[0] = [1, 1, 1, 1]
+colormap_DoS = LinearSegmentedColormap.from_list("custom_colormap", colors_DoS)
+norm_DoS = Normalize(vmin=min_DoS, vmax=max_DoS)
 norm_theta = Normalize(vmin=0, vmax=1)
-colormap_DoS = cm.ScalarMappable(norm=Normalize(vmin=min_value, vmax=max_value), cmap=color_map)
-# colormap_theta = cm.ScalarMappable(norm=Normalize(vmin=0, vmax=1), cmap=color_map)
-# edge_cmap_theta = color_map(norm_theta(np.diag(theta)))
+colorbar_DoS = cm.ScalarMappable(norm=Normalize(vmin=min_DoS, vmax=max_DoS), cmap=colormap_DoS)
+
+# Diverging colormap for the invariants
+norm_invariants = mcolors.TwoSlopeNorm(vmin=-1, vcenter=0, vmax=1)
+hex_blues_mako_r = sns.color_palette("mako_r", 6).as_hex()[:4]
+hex_white = ['#ffffff']
+hex_reds = sns.color_palette("flare_r", 6).as_hex()[2:]
+hex_list = hex_reds + hex_white + hex_blues_mako_r
+float_list = [0.0, 0.2, 0.4, 0.45, 0.5, 0.55, 0.6, 0.8, 1.0]
+colormap_invariants = get_continuous_cmap(hex_list, float_list=float_list)
+colorbar_invariants = cm.ScalarMappable(norm=norm_invariants, cmap=colormap_invariants)
+# hex_list = ['#ff416d', '#ff7192', '#ffa0b6', '#ffd0db','#ffffff','#cfdaff', '#9fb6ff', '#6f91ff', '#3f6cff']
+
+# Non-divergent colormap for the invariants
+# hex_blues_mako_r = sns.color_palette("mako_r", 6).as_hex()
+# hex_white = ['#ffffff']
+# norm_invariants = Normalize(vmin=0, vmax=1)
+# colormap_invariants = get_continuous_cmap(hex_white + hex_blues_mako_r)
+# colorbar_invariants = cm.ScalarMappable(norm=norm_invariants, cmap=colormap_invariants)
 
 
-# Mode invariant
-divnorm = mcolors.TwoSlopeNorm(vmin=-1, vcenter=0, vmax=1)
-# hex_list = ['#ff416d', '#ff7192', '#ffa0b6', '#ffd0db', '#ffffff', '#cfdaff', '#9fb6ff', '#6f91ff', '#3f6cff']
-hex_list = ['#800026', '#ff416d', '#ff7192', '#ffa0b6', '#ffd0db','#ffffff','#cfdaff', '#9fb6ff', '#6f91ff', '#3f6cff','#00008b']
-float_list = [0.0, 0.2, 0.3, 0.4, 0.45, 0.5, 0.55, 0.6, 0.7, 0.8, 1.0]
-cmap = get_continuous_cmap(hex_list, float_list=float_list)
-colormap_marker = cm.ScalarMappable(norm=divnorm, cmap=cmap)
-
-
-fig1 = plt.figure(figsize=(14, 4))
-gs = GridSpec(1, 3, figure=fig1, wspace=0.3)
-ax0 = fig1.add_subplot(gs[0, 0])
-ax1 = fig1.add_subplot(gs[0, 1])
-ax2 = fig1.add_subplot(gs[0, 2])
-ax0_inset = ax0.inset_axes([0.65, 0.15, 0.3, 0.3])
-ax1_inset = ax1.inset_axes([0.68, 0.15, 0.3, 0.3])
-pos0 = ax0.get_position()
-pos1 = ax1.get_position()
-pos2 = ax2.get_position()
-ax0.set_position([pos0.x0 - 0.05, pos0.y0, pos0.width, pos0.height])
-ax1.set_position([pos1.x0 + 0.01, pos1.y0, pos1.width, pos1.height])
-ax2.set_position([pos2.x0 + 0.05, pos2.y0, pos2.width, pos2.height])
-
-
-# Energy spectrum
-ax0.plot(np.arange(len(Hval)), Hval, marker='o', color='mediumslateblue', linestyle='None', markersize=1)
-ax0.set_xlabel('$\\vert \\epsilon \\rangle$', fontsize=fontsize, labelpad=-15)
-ax0.set_ylabel('$\epsilon$', fontsize=fontsize, labelpad=-10)
-ax0.set_xlim(0, len(Hval))
-ax0.set_ylim(np.min(Hval), np.max(Hval))
-ax0.tick_params(which='major', width=0.75, labelsize=fontsize, color='black')
-ax0.tick_params(which='major', length=6, labelsize=fontsize, color='black')
-ax0.set(xticks=[0, len(Hval)])
-
-# DoS of the zero modes
-ax0_inset.scatter(site_pos[:, 0], site_pos[:, 1], c=DoS_edge, cmap=color_map, edgecolor='black', s=10, linewidths=0.1)
-ax0_inset.tick_params(which='major', width=0.75, labelsize=fontsize_inset, color='black')
-ax0_inset.tick_params(which='major', length=6, labelsize=fontsize_inset, color='black')
-ax0_inset.set(xticks=[0, Nx], yticks=[0, Ny])
-ax0_inset.set_xlabel('$x$', fontsize=fontsize_inset, labelpad=-15)
-ax0_inset.set_ylabel('$y$', fontsize=fontsize_inset, labelpad=-15)
-ax0_inset.set_title('$\\vert \psi (r)\\vert ^2$', fontsize=fontsize_inset)
-divider = make_axes_locatable(ax0)
-cax = divider.append_axes("right", size="5%", pad=0.1)
-cbar = fig1.colorbar(colormap_DoS, cax=cax, orientation='vertical', ticks=[0, np.round(0.5 * max_value, 2), np.round(max_value, 2)])
-cbar.ax.tick_params(which='major', width=0.75, labelsize=fontsize)
+# Defining the shell and A regions
+def theta_func(x, b, a):
+    return 1 - 1 / (1 + np.exp(-a * (x - b)))
+x_theta = np.linspace(0, Nx, 1000)
+y_theta = np.linspace(0, Ny, 1000)
+theta_grid = np.zeros((1000, 1000))
+shell_x, shell_y = [], []
+for i, x_coord in enumerate(x_theta):
+    for j, y_coord in enumerate(y_theta):
+        r = np.sqrt(x_coord ** 2 + y_coord ** 2)
+        theta_grid[i, j] = theta_func(r, center_theta, sharpness_theta)
+        if 0.45 < theta_grid[i, j] < 0.55:
+            shell_x.append(x_coord)
+            shell_y.append(y_coord)
+shell_x.append(-1)
+shell_y.append(max(shell_y))
+sorted_indices = np.argsort(np.array(shell_x))
+shell_x, shell_y = np.array(shell_x)[sorted_indices], np.array(shell_y)[sorted_indices]
+A_region = Polygon([[-1, -1], [Nx/2 - 0.5, -1], [Nx/2 - 0.5, Nx/2 - 0.5], [-1, Nx/2 - 0.5]],
+                   closed=True, alpha=1, edgecolor=colors_DoS[50], facecolor='None')
 
 
 
-# OPDM spectrum
-ax1.plot(np.arange(len(rhoredval)), rhoredval, marker='o', color='mediumslateblue', linestyle='None', markersize=2)
-ax1.set_xlabel('$\\vert \\alpha \\rangle$', fontsize=fontsize, labelpad=-15)
-ax1.set_ylabel('$\\lambda_\\alpha$', fontsize=fontsize)
+
+fig2 = plt.figure(figsize=(8, 6))
+gs = GridSpec(2, 2, figure=fig2, wspace=0.45, hspace=0.3)
+ax1 = fig2.add_subplot(gs[0, 0])
+ax2 = fig2.add_subplot(gs[0, 1])
+ax3 = fig2.add_subplot(gs[1, 0])
+ax4 = fig2.add_subplot(gs[1, 1])
+fig2.text(0.03, 0.85, '$(a)$', fontsize=20, ha="center")
+fig2.text(0.03, 0.4, '$(c)$', fontsize=20, ha="center")
+fig2.text(0.51, 0.85, '$(b)$', fontsize=20, ha="center")
+fig2.text(0.51, 0.4, '$(d)$', fontsize=20, ha="center")
+
+
+# Spectrum of the restricted OPDM
+ax1.plot(np.arange(len(rhoredval)), rhoredval, marker='o', color=colors_DoS[30], linestyle='None', markersize=2)
+ax1.set_xlabel(' $N_\lambda$', fontsize=fontsize, labelpad=-15)
+ax1.set_ylabel('$\\lambda$', fontsize=fontsize)
 ax1.set_xlim(0, len(rhoredval))
 ax1.set_ylim(np.min(rhoredval)-0.05, np.max(rhoredval) + 0.05)
 ax1.tick_params(which='major', width=0.75, labelsize=fontsize, color='black')
 ax1.tick_params(which='major', length=6, labelsize=fontsize, color='black')
 ax1.set(xticks=[0, len(rhoredval)])
+ax1.text(20, 0.8, f'$L={Nx}$', fontsize=20)
+ax1.text(250, 0.4, f'$\\gamma={gamma}$', fontsize=20)
+ax1.text(250, 0.2, f'$\\eta={lamb}$', fontsize=20)
 
-ax1_inset.scatter(site_pos[A_indices, 0], site_pos[A_indices, 1], c=np.diag(theta), cmap=color_map, edgecolor='black', s=20, linewidths=0.2)
-ax1_inset.tick_params(which='major', width=0.75, labelsize=fontsize_inset, color='black')
-ax1_inset.tick_params(which='major', length=6, labelsize=fontsize_inset, color='black')
-ax1_inset.set(xticks=[0, int(Nx/2) - 1], yticks=[0, int(Ny/2) - 1])
-ax1_inset.set_xlabel('$x$', fontsize=fontsize_inset, labelpad=-15)
-ax1_inset.set_ylabel('$y$', fontsize=fontsize_inset, labelpad=-10)
-ax1_inset.set_title('$\\theta (r)$', fontsize=fontsize_inset)
-divider = make_axes_locatable(ax1)
-cax = divider.append_axes("right", size="5%", pad=0.1)
-cbar = fig1.colorbar(colormap_DoS, cax=cax, orientation='vertical', ticks=[0, np.round(0.5 * max_value, 2), np.round(max_value, 2)])
-cbar.ax.tick_params(which='major', width=0.75, labelsize=fontsize)
-ax1_inset.set_xlim(-1, Nx/2)
-ax1_inset.set_ylim(-1, Ny/2)
-
-
-# Markers
-ax2.scatter(site_pos[A_indices, 0], site_pos[A_indices, 1], c=Imode_marker+Ishell_marker, cmap=cmap, norm=divnorm, edgecolor='black', s=130)
-ax2.scatter(site_pos[indices_shell, 0], site_pos[indices_shell, 1], facecolors='none', edgecolor='violet', s=130, linewidths=2, alpha=0.7)
-ax2.set_xlim(-1, Nx/2)
-ax2.set_ylim(-1, Ny/2)
+# DoS of the zero modes
+ax2.scatter(site_pos[:, 0], site_pos[:, 1], c=DoS_edge, cmap=colormap_DoS, edgecolor='black', s=30, linewidths=0.5, zorder=2)
 ax2.tick_params(which='major', width=0.75, labelsize=fontsize, color='black')
 ax2.tick_params(which='major', length=6, labelsize=fontsize, color='black')
-ax2.set(xticks=[0, Nx/2 - 1], yticks=[0, Ny/2 -1])
-ax2.set_xlabel('$x$', fontsize=fontsize, labelpad=-15)
-ax2.set_ylabel('$y$', fontsize=fontsize, labelpad=-7)
-ax2.tick_params(which='major', width=0.75, labelsize=fontsize, color='black')
-ax2.tick_params(which='major', length=6, labelsize=fontsize, color='black')
+ax2.set_xlim(-1.5, Nx + 0.5)
+ax2.set_ylim(-1.5, Ny + 0.5)
+ax2.set(xticks=[0, Nx-1], yticks=[0, Ny-1])
+ax2.set_xlabel('$x$', fontsize=fontsize, labelpad=-20)
+ax2.set_ylabel('$y$', fontsize=fontsize, labelpad=-15)
+ax2.fill_between(shell_x, shell_y, color=colors_DoS[30], alpha=0.4, edgecolor=None, zorder=1)
+ax2.fill_between(shell_x, -np.ones(shell_y.shape), color=colors_DoS[30], alpha=0.4, edgecolor=None, zorder=1)
+ax2.add_patch(A_region)
+txt = ax2.text(6, 6, '$\mathcal{A}$', fontsize=20)
+txt.set_path_effects([path_effects.Stroke(linewidth=5, foreground='white'), path_effects.Normal()])
+# DoS for the zero modes: colorbar
 divider = make_axes_locatable(ax2)
 cax = divider.append_axes("right", size="5%", pad=0.1)
-cbar=fig1.colorbar(colormap_marker, cax=cax, orientation='vertical')
+cbar = fig2.colorbar(colorbar_DoS, cax=cax, orientation='vertical', ticks=[0, max_DoS])
+cbar.set_ticklabels(['0.00', f'{max_DoS :.2f} '])
 cbar.ax.tick_params(which='major', width=0.75, labelsize=fontsize)
-cbar.set_label(label='$\mathcal{I}_{\\rm mode} + \mathcal{I}_{\\rm shell}$', labelpad=5, fontsize=20)
+cbar.set_label(label='$\\vert \psi (\mathbf{r})\\vert ^2$', labelpad=-20, fontsize=20)
+
+
+# Mode index
+ax3.scatter(site_pos[A_indices, 0], site_pos[A_indices, 1], c=Imode_marker, cmap=colormap_invariants,
+            norm=norm_invariants, edgecolor='black', s=130, zorder=2)
+ax3.set_xlim(-1, Nx/2)
+ax3.set_ylim(-1, Ny/2)
+ax3.set_xlabel('$x$', fontsize=fontsize, labelpad=-20)
+ax3.set_ylabel('$y$', fontsize=fontsize, labelpad=-7)
+ax3.set(xticks=[0, Nx/2 - 1], yticks=[0, Ny/2 - 1])
+ax3.tick_params(which='major', width=0.75, labelsize=fontsize, color='black')
+ax3.tick_params(which='major', length=6, labelsize=fontsize, color='black')
+ax3.tick_params(which='major', width=0.75, labelsize=fontsize, color='black')
+ax3.tick_params(which='major', length=6, labelsize=fontsize, color='black')
+ax3.fill_between(shell_x, shell_y, color=colors_DoS[30], alpha=0.2, edgecolor=None, zorder=1)
+ax3.fill_between(shell_x, -np.ones(shell_y.shape), color=colors_DoS[30], alpha=0.2, edgecolor=None, zorder=1)
+ax3.text(6.85, 8.9, f'$\mathcal{{I}}_{{\\rm mode}}={str(total_mode)[:5]}$', fontsize=15, ha="center",
+         bbox=dict(facecolor="white", edgecolor="black", alpha=1))
+# Mode Index: Colorbar
+divider = make_axes_locatable(ax3)
+cax = divider.append_axes("right", size="5%", pad=0.1)
+cbar = fig2.colorbar(colorbar_invariants, cax=cax, orientation='vertical')
+cbar.ax.tick_params(which='major', width=0.75, labelsize=fontsize)
+cbar.set_label(label='$\mathcal{I}_{\\rm mode}(\mathbf{r})$', labelpad=-20, fontsize=20)
 
 
 
-fig1.savefig('fig1.pdf', format='pdf', bbox_inches='tight')
+# Shell Index
+ax4.scatter(site_pos[A_indices, 0], site_pos[A_indices, 1], c=Ishell_marker, cmap=colormap_invariants,
+            norm=norm_invariants, edgecolor='black', s=130, zorder=2)
+ax4.set_xlim(-1, Nx/2)
+ax4.set_ylim(-1, Ny/2)
+ax4.set_xlabel('$x$', fontsize=fontsize, labelpad=-20)
+ax4.set_ylabel('$y$', fontsize=fontsize, labelpad=-7)
+ax4.set(xticks=[0, Nx/2 - 1], yticks=[0, Ny/2 -1])
+ax4.tick_params(which='major', width=0.75, labelsize=fontsize, color='black')
+ax4.tick_params(which='major', length=6, labelsize=fontsize, color='black')
+ax4.tick_params(which='major', width=0.75, labelsize=fontsize, color='black')
+ax4.tick_params(which='major', length=6, labelsize=fontsize, color='black')
+ax4.fill_between(shell_x, shell_y, color=colors_DoS[30], alpha=0.2, edgecolor=None, zorder=1)
+ax4.fill_between(shell_x, -np.ones(shell_y.shape), color=colors_DoS[30], alpha=0.2, edgecolor=None, zorder=1)
+ax4.text(7, 8.9, f'$\mathcal{{I}}_{{\\rm shell}}={str(total_shell)[:5]}$', fontsize=15, ha="center",
+         bbox=dict(facecolor="white", edgecolor="black", alpha=1))
+# Shell invariant: Colorbar
+divider = make_axes_locatable(ax4)
+cax = divider.append_axes("right", size="5%", pad=0.1)
+cbar = fig2.colorbar(colorbar_invariants, cax=cax, orientation='vertical')
+cbar.ax.tick_params(which='major', width=0.75, labelsize=fontsize)
+cbar.set_label(label='$\mathcal{I}_{\\rm shell}(\mathbf{r})$', labelpad=-10, fontsize=20)
+
+
+
+
+fig2.savefig('fig-2.pdf', format='pdf')
 plt.show()
