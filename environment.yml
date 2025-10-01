@@ -83,6 +83,7 @@ dependencies:
   - python_abi=3.11=7_cp311
   - pytz=2024.1=py311hca03da5_0
   - qsymm=1.4.0=pyhd8ed1ab_1
+  - qutip=5.2.0=py311hd8e4ee4_0
   - readline=8.2=h1a28f6b_0
   - scipy=1.15.3=py311hb81b3df_0
   - seaborn=0.13.2=py311hca03da5_3
@@ -101,3 +102,5 @@ dependencies:
   - xz=5.6.4=h80987f9_1
   - zlib=1.2.13=hfb2fe0b_6
   - zstd=1.5.6=hfb09047_0
+
+
